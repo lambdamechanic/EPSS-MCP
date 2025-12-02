@@ -15,6 +15,8 @@ EPSS_API_BASE = "https://api.first.org/data/v1/epss?cve="
 logger = logging.getLogger(__name__)
 
 CACHE_FOLDER = os.getenv("CACHE_FOLDER")
+if not CACHE_FOLDER:
+    logger.warning("CACHE_FOLDER not set; EPSS responses will not be cached.")
 
 _retry_policy = RetryPolicy(
     max_retries=5,
