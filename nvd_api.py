@@ -130,6 +130,9 @@ async def fetch_cve_details_with_key(cve_id: str, api_key: str | None = None) ->
     limiter = _limiter_with_key if api_key else _limiter_no_key
 
     transport = AsyncRetryTransport(policy=_retry_policy)
+    # Note: retries happen inside the transport, so limiter covers the initial call only;
+    # retries back off exponentially and include 429s, which keeps total pressure low even
+    # though they don't consume extra limiter tokens.
 
     async with limiter:
         async with httpx.AsyncClient(headers=headers, transport=transport) as client:
