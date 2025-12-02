@@ -27,7 +27,12 @@ if API_KEY:
 rate_limiter = AsyncLimiter(50 if API_KEY else 5, 30)
 
 async def fetch_cve_details(cve_id: str) -> Dict[str, Any] | None:
-    """Fetch CVE details from the NVD API."""
+    """Fetch CVE details from the NVD API.
+
+    Returns a dict with description, cwe, cvss_score and optionally an
+    "error" field when the request fails, following the MCP error-handling
+    guidance (log internal details; return safe, actionable messages).
+    """
     url = f"{NVD_API_BASE}{cve_id}"
     async with rate_limiter:
         async with httpx.AsyncClient(headers=headers) as client:
@@ -55,16 +60,41 @@ async def fetch_cve_details(cve_id: str) -> Dict[str, Any] | None:
                     "cwe": cwe,
                     "cvss_score": cvss_score
                 }
-            except httpx.RequestError:
+            except httpx.RequestError as exc:
                 logger.exception("NVD request error for %s", cve_id)
-            except httpx.HTTPStatusError:
+                return {
+                    "description": "No description available",
+                    "cwe": "N/A",
+                    "cvss_score": "N/A",
+                    "error": f"NVD request failed: {exc.__class__.__name__}"
+                }
+            except httpx.HTTPStatusError as exc:
                 logger.exception("NVD HTTP status error for %s", cve_id)
+                return {
+                    "description": "No description available",
+                    "cwe": "N/A",
+                    "cvss_score": "N/A",
+                    "error": f"NVD service returned status {exc.response.status_code}"
+                }
             except ValueError:
                 logger.exception("NVD JSON decoding error for %s", cve_id)
+                return {
+                    "description": "No description available",
+                    "cwe": "N/A",
+                    "cvss_score": "N/A",
+                    "error": "NVD response was not valid JSON"
+                }
             except Exception:
                 logger.exception("Unexpected error fetching NVD data for %s", cve_id)
+                return {
+                    "description": "No description available",
+                    "cwe": "N/A",
+                    "cvss_score": "N/A",
+                    "error": "Unexpected error fetching NVD data"
+                }
             return {
                 "description": "No description available",
                 "cwe": "N/A",
-                "cvss_score": "N/A"
+                "cvss_score": "N/A",
+                "error": "NVD data unavailable"
             }

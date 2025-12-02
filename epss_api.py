@@ -25,12 +25,31 @@ async def fetch_epss_data(cve_id: str) -> Dict[str, Any] | None:
                 "epss_percentile": epss_data.get("percentile", "N/A"),
                 "epss_score": epss_data.get("epss", "N/A")
             }
-        except httpx.RequestError:
+        except httpx.RequestError as exc:
             logger.exception("EPSS request error for %s", cve_id)
-        except httpx.HTTPStatusError:
+            return {
+                "epss_percentile": "N/A",
+                "epss_score": "N/A",
+                "error": f"EPSS request failed: {exc.__class__.__name__}"
+            }
+        except httpx.HTTPStatusError as exc:
             logger.exception("EPSS HTTP status error for %s", cve_id)
+            return {
+                "epss_percentile": "N/A",
+                "epss_score": "N/A",
+                "error": f"EPSS service returned status {exc.response.status_code}"
+            }
         except ValueError:
             logger.exception("EPSS JSON decoding error for %s", cve_id)
+            return {
+                "epss_percentile": "N/A",
+                "epss_score": "N/A",
+                "error": "EPSS response was not valid JSON"
+            }
         except Exception:
             logger.exception("Unexpected error fetching EPSS data for %s", cve_id)
-        return {"epss_percentile": "N/A", "epss_score": "N/A"}
+            return {
+                "epss_percentile": "N/A",
+                "epss_score": "N/A",
+                "error": "Unexpected error fetching EPSS data"
+            }
