@@ -1,8 +1,11 @@
 from typing import Any, Dict
 import httpx
+import logging
 
 # Constants
 EPSS_API_BASE = "https://api.first.org/data/v1/epss?cve="
+
+logger = logging.getLogger(__name__)
 
 async def fetch_epss_data(cve_id: str) -> Dict[str, Any] | None:
     """Fetch the EPSS percentile and score for a given CVE ID."""
@@ -23,11 +26,11 @@ async def fetch_epss_data(cve_id: str) -> Dict[str, Any] | None:
                 "epss_score": epss_data.get("epss", "N/A")
             }
         except httpx.RequestError:
-            pass
+            logger.exception("EPSS request error for %s", cve_id)
         except httpx.HTTPStatusError:
-            pass
+            logger.exception("EPSS HTTP status error for %s", cve_id)
         except ValueError:
-            pass
+            logger.exception("EPSS JSON decoding error for %s", cve_id)
         except Exception:
-            pass
+            logger.exception("Unexpected error fetching EPSS data for %s", cve_id)
         return {"epss_percentile": "N/A", "epss_score": "N/A"}
