@@ -10,7 +10,7 @@ import logging
 mcp = FastMCP("EPSS-MCP")
 
 @mcp.tool()
-async def get_cve_info(cve_id: str) -> str:
+async def get_cve_info(cve_id: str, nvd_api_key: str | None = None) -> str:
     """Get CVE information including description, CWE, CVSS score, and EPSS data.
 
     Args:
@@ -18,7 +18,7 @@ async def get_cve_info(cve_id: str) -> str:
     """
     logging.debug(f"Fetching CVE information for: {cve_id}")
 
-    nvd_data = await fetch_cve_details(cve_id)
+    nvd_data = await fetch_cve_details(cve_id, api_key=nvd_api_key)
     logging.debug(f"NVD Data: {nvd_data}")
 
     epss_data = await fetch_epss_data(cve_id)

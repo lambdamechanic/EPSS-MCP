@@ -15,26 +15,36 @@ logger = logging.getLogger(__name__)
 # Fetch API key from environment variables
 API_KEY = os.getenv("NVD_API_KEY")
 
-headers = {
+BASE_HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'
 }
 
-# Only send apiKey when it is actually provided
-if API_KEY:
-    headers['apiKey'] = API_KEY
-
 # NVD rate limits: 50 requests per 30s with an API key, 5 without one
-rate_limiter = AsyncLimiter(50 if API_KEY else 5, 30)
+_limiter_with_key = AsyncLimiter(50, 30)
+_limiter_no_key = AsyncLimiter(5, 30)
 
-async def fetch_cve_details(cve_id: str) -> Dict[str, Any] | None:
+async def fetch_cve_details(cve_id: str, api_key: str | None = None) -> Dict[str, Any] | None:
     """Fetch CVE details from the NVD API.
 
     Returns a dict with description, cwe, cvss_score and optionally an
     "error" field when the request fails, following the MCP error-handling
     guidance (log internal details; return safe, actionable messages).
     """
+    key = api_key if api_key is not None else API_KEY
+    return await fetch_cve_details_with_key(cve_id, api_key=key)
+
+
+async def fetch_cve_details_with_key(cve_id: str, api_key: str | None = None) -> Dict[str, Any] | None:
+    """Same as fetch_cve_details but allows providing a per-call API key."""
     url = f"{NVD_API_BASE}{cve_id}"
-    async with rate_limiter:
+
+    headers = dict(BASE_HEADERS)
+    if api_key:
+        headers['apiKey'] = api_key
+
+    limiter = _limiter_with_key if api_key else _limiter_no_key
+
+    async with limiter:
         async with httpx.AsyncClient(headers=headers) as client:
             try:
                 response = await client.get(url, timeout=30.0)
