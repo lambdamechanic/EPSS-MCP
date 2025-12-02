@@ -10,7 +10,7 @@ import logging
 mcp = FastMCP("EPSS-MCP")
 
 @mcp.tool()
-async def get_cve_info(cve_id: str) -> str:
+async def get_cve_info(cve_id: str, nvd_api_key: str | None = None) -> str:
     """Get CVE information including description, CWE, CVSS score, and EPSS data.
 
     Args:
@@ -18,7 +18,7 @@ async def get_cve_info(cve_id: str) -> str:
     """
     logging.debug(f"Fetching CVE information for: {cve_id}")
 
-    nvd_data = await fetch_cve_details(cve_id)
+    nvd_data = await fetch_cve_details(cve_id, api_key=nvd_api_key)
     logging.debug(f"NVD Data: {nvd_data}")
 
     epss_data = await fetch_epss_data(cve_id)
@@ -33,6 +33,11 @@ async def get_cve_info(cve_id: str) -> str:
     epss_percentile = f"{float(epss_data.get('epss_percentile', 0)) * 100:.2f}%" if epss_data.get("epss_percentile") != "N/A" else "N/A"
     epss_score = f"{float(epss_data.get('epss_score', 0)):.4f}" if epss_data.get("epss_score") != "N/A" else "N/A"
 
+    error_notes = []
+    for source, payload in (("NVD", nvd_data), ("EPSS", epss_data)):
+        if isinstance(payload, dict) and payload.get("error"):
+            error_notes.append(f"{source}: {payload['error']}")
+
     response = f"""
 CVE ID: {cve_id}
 Description: {description}
@@ -40,6 +45,7 @@ CWE: {cwe}
 CVSS Score: {cvss_score}
 EPSS Percentile: {epss_percentile}
 EPSS Score: {epss_score}
+{"\nErrors: " + '; '.join(error_notes) if error_notes else ''}
 """
     return response
 

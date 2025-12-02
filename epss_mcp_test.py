@@ -4,13 +4,13 @@ from nvd_api import fetch_cve_details, NVD_API_BASE
 from epss_api import fetch_epss_data, EPSS_API_BASE
 
 
-async def get_cve_info(cve_id: str) -> str:
+async def get_cve_info(cve_id: str, nvd_api_key: str | None = None) -> str:
     """Get CVE information including description, CWE, CVSS score, and EPSS data."""
     logging.debug(f"Fetching CVE information for: {cve_id}")
     logging.debug(f"NVD API URL: {NVD_API_BASE}{cve_id}")
     logging.debug(f"EPSS API URL: {EPSS_API_BASE}{cve_id}")
 
-    nvd_data = await fetch_cve_details(cve_id)
+    nvd_data = await fetch_cve_details(cve_id, api_key=nvd_api_key)
     logging.debug(f"NVD Data: {nvd_data}")
 
     epss_data = await fetch_epss_data(cve_id)
