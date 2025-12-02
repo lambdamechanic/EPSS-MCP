@@ -83,6 +83,27 @@ def _store_cache(url: str, headers: Dict[str, Any], data: Dict[str, Any], defaul
     except Exception:
         logger.exception("Failed writing cache for %s", url)
 
+
+def _normalize_nvd(data: Dict[str, Any]) -> Dict[str, Any]:
+    vulnerabilities = data.get("vulnerabilities", []) if isinstance(data, dict) else []
+    if not vulnerabilities:
+        return {
+            "description": "No description available",
+            "cwe": "N/A",
+            "cvss_score": "N/A"
+        }
+
+    cve_data = vulnerabilities[0].get("cve", {})
+    cve_description = cve_data.get("descriptions", [{}])[0].get("value", "No description available")
+    cwe = cve_data.get("weaknesses", [{}])[0].get("description", [{}])[0].get("value", "N/A")
+    cvss_score = cve_data.get("metrics", {}).get("cvssMetricV31", [{}])[0].get("cvssData", {}).get("baseScore", "N/A")
+
+    return {
+        "description": cve_description,
+        "cwe": cwe,
+        "cvss_score": cvss_score
+    }
+
 async def fetch_cve_details(cve_id: str, api_key: str | None = None) -> Dict[str, Any] | None:
     """Fetch CVE details from the NVD API.
 
@@ -100,7 +121,7 @@ async def fetch_cve_details_with_key(cve_id: str, api_key: str | None = None) ->
 
     cached = _load_cache(url)
     if cached:
-        return cached
+        return _normalize_nvd(cached)
 
     headers = dict(BASE_HEADERS)
     if api_key:
@@ -118,25 +139,7 @@ async def fetch_cve_details_with_key(cve_id: str, api_key: str | None = None) ->
                 data = response.json()
                 _store_cache(url, response.headers, data, default_ttl=600)
 
-                # Extract relevant information
-                vulnerabilities = data.get("vulnerabilities", [])
-                if not vulnerabilities:
-                    return {
-                        "description": "No description available",
-                        "cwe": "N/A",
-                        "cvss_score": "N/A"
-                    }
-
-                cve_data = vulnerabilities[0].get("cve", {})
-                cve_description = cve_data.get("descriptions", [{}])[0].get("value", "No description available")
-                cwe = cve_data.get("weaknesses", [{}])[0].get("description", [{}])[0].get("value", "N/A")
-                cvss_score = cve_data.get("metrics", {}).get("cvssMetricV31", [{}])[0].get("cvssData", {}).get("baseScore", "N/A")
-
-                return {
-                    "description": cve_description,
-                    "cwe": cwe,
-                    "cvss_score": cvss_score
-                }
+                return _normalize_nvd(data)
             except httpx.RequestError as exc:
                 logger.exception("NVD request error for %s", cve_id)
                 return {

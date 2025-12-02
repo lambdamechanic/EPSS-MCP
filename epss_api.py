@@ -66,12 +66,23 @@ def _store_cache(url: str, headers: Dict[str, Any], data: Dict[str, Any]) -> Non
     except Exception:
         logger.exception("Failed writing cache for %s", url)
 
+
+def _normalize_epss(data: Dict[str, Any]) -> Dict[str, Any]:
+    if not isinstance(data, dict) or "data" not in data or not data.get("data"):
+        return {"epss_percentile": "N/A", "epss_score": "N/A"}
+
+    epss_data = data["data"][0]
+    return {
+        "epss_percentile": epss_data.get("percentile", "N/A"),
+        "epss_score": epss_data.get("epss", "N/A")
+    }
+
 async def fetch_epss_data(cve_id: str) -> Dict[str, Any] | None:
     """Fetch the EPSS percentile and score for a given CVE ID."""
     url = f"{EPSS_API_BASE}{cve_id}"
     cached = _load_cache(url)
     if cached:
-        return cached
+        return _normalize_epss(cached)
 
     transport = AsyncRetryTransport(policy=_retry_policy)
 
@@ -82,15 +93,7 @@ async def fetch_epss_data(cve_id: str) -> Dict[str, Any] | None:
             data = response.json()
             _store_cache(url, response.headers, data)
 
-            # Validate the JSON structure
-            if not isinstance(data, dict) or "data" not in data or not data["data"]:
-                return {"epss_percentile": "N/A", "epss_score": "N/A"}
-
-            epss_data = data["data"][0]
-            return {
-                "epss_percentile": epss_data.get("percentile", "N/A"),
-                "epss_score": epss_data.get("epss", "N/A")
-            }
+            return _normalize_epss(data)
         except httpx.RequestError as exc:
             logger.exception("EPSS request error for %s", cve_id)
             return {
