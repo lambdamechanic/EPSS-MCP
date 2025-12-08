@@ -9,8 +9,10 @@ import os
 import time
 from pathlib import Path
 
-# Constants
-EPSS_API_BASE = "https://api.first.org/data/v1/epss?cve="
+# Configuration
+# Defaults mirror the public CISA EPSS v2 API but can be overridden via env vars.
+EPSS_API_BASE = os.getenv("EPSS_API_BASE", "https://api.cisa.gov/epss")
+EPSS_API_VERSION = os.getenv("EPSS_API_VERSION", "v2")
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +30,13 @@ _retry_policy = RetryPolicy(
 
 def _cache_path(url: str) -> Path:
     return Path(CACHE_FOLDER) / f"epss_{hashlib.sha256(url.encode()).hexdigest()}.json"
+
+
+def _build_epss_url(cve_id: str) -> str:
+    """Construct the EPSS endpoint from base/version overrides."""
+    base = EPSS_API_BASE.rstrip("/")
+    version = EPSS_API_VERSION.strip("/")
+    return f"{base}/{version}/epss?cve={cve_id}"
 
 
 def _load_cache(url: str) -> Dict[str, Any] | None:
@@ -81,7 +90,7 @@ def _normalize_epss(data: Dict[str, Any]) -> Dict[str, Any]:
 
 async def fetch_epss_data(cve_id: str) -> Dict[str, Any] | None:
     """Fetch the EPSS percentile and score for a given CVE ID."""
-    url = f"{EPSS_API_BASE}{cve_id}"
+    url = _build_epss_url(cve_id)
     cached = _load_cache(url)
     if cached:
         return _normalize_epss(cached)

@@ -1,7 +1,13 @@
 httpx
 httpx-retry
-fastapi
-uvicorn
-pydantic
-mcpo
+fastapi>=0.114,<0.125
+uvicorn>=0.34,<0.39
+pydantic>=2.11,<2.13
+pydantic_core>=2.33,<2.42
+typing_extensions>=4.13,<5
+typer>=0.15,<0.21
+mcp~=1.23.1
 aiolimiter
+pytest
+pytest-asyncio
+respx
