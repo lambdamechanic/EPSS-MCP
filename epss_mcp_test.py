@@ -1,44 +1,33 @@
-import asyncio
-import logging
-from nvd_api import fetch_cve_details, NVD_API_BASE
-from epss_api import fetch_epss_data, EPSS_API_BASE
+import pytest
+
+from epss_mcp import get_cve_info
 
 
-async def get_cve_info(cve_id: str, nvd_api_key: str | None = None) -> str:
-    """Get CVE information including description, CWE, CVSS score, and EPSS data."""
-    logging.debug(f"Fetching CVE information for: {cve_id}")
-    logging.debug(f"NVD API URL: {NVD_API_BASE}{cve_id}")
-    logging.debug(f"EPSS API URL: {EPSS_API_BASE}{cve_id}")
+@pytest.mark.asyncio
+async def test_get_cve_info_renders_values(monkeypatch):
+    cve_id = "CVE-2023-9999"
 
-    nvd_data = await fetch_cve_details(cve_id, api_key=nvd_api_key)
-    logging.debug(f"NVD Data: {nvd_data}")
+    async def fake_nvd(*_args, **_kwargs):
+        return {
+            "description": "Example issue",
+            "cwe": "CWE-79",
+            "cvss_score": 7.5,
+        }
 
-    epss_data = await fetch_epss_data(cve_id)
-    logging.debug(f"EPSS Data: {epss_data}")
+    async def fake_epss(*_args, **_kwargs):
+        return {
+            "epss_percentile": 0.25,
+            "epss_score": 0.1234,
+        }
 
-    if not nvd_data:
-        return f"Unable to fetch CVE details for {cve_id}. Please check the CVE ID or try again later."
+    monkeypatch.setattr("epss_mcp.fetch_cve_details", fake_nvd)
+    monkeypatch.setattr("epss_mcp.fetch_epss_data", fake_epss)
 
-    description = nvd_data.get("description", "No description available")
-    cwe = nvd_data.get("cwe", "N/A")
-    cvss_score = nvd_data.get("cvss_score", "N/A")
-    epss_percentile = f"{float(epss_data.get('epss_percentile', 0)) * 100:.2f}%" if epss_data.get("epss_percentile") != "N/A" else "N/A"
-    epss_score = f"{float(epss_data.get('epss_score', 0)):.4f}" if epss_data.get("epss_score") != "N/A" else "N/A"
-    
-    response = f"""
-CVE ID: {cve_id}
-Description: {description}
-CWE: {cwe}
-CVSS Score: {cvss_score}
-EPSS Percentile: {epss_percentile}
-EPSS Score: {epss_score}
-"""
-    return response
+    result = await get_cve_info(cve_id)
 
-def test_get_cve_info():
-    cve_id = "CVE-2023-23397"  # Static CVE ID for testing
-    result = asyncio.run(get_cve_info(cve_id))
-    print(result)
-
-if __name__ == "__main__":
-    test_get_cve_info()
+    assert "CVE-2023-9999" in result
+    assert "Example issue" in result
+    assert "CWE-79" in result
+    assert "7.5" in result
+    assert "25.00%" in result
+    assert "0.1234" in result
